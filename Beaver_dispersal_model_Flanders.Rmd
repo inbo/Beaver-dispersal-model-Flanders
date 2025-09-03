@@ -70,7 +70,7 @@ levy.walker <- (species(state.RW() + state.CRW(0.98), trans = transitionMatrix(0
 totaal <- NULL
 allpoints <- st_as_sf(data.frame("x" = init_dummy_all[,1],
                                   "y" = init_dummy_all[,2], run = 0, 
-                                  jaar = 0),
+                                  year = 0),
                        coords = c("x", "y"), crs = 25831)
 
 ```
@@ -187,7 +187,7 @@ rds_files <- list.files(data, pattern = "\\.RDS$", full.names = TRUE)
 
 data_rds <- do.call(rbind, lapply(rds_files, readRDS))
 
-data_first <- data_rds %>% filter(run == 0 & jaar == 0) %>% 
+data_first <- data_rds %>% filter(run == 0 & year == 0) %>% 
   distinct(geometry, .keep_all = TRUE)
 
 data_second <- data_rds %>% filter(run != 0)
@@ -201,35 +201,31 @@ data_rds <- rbind(data_first,
 
 points_mod <- data_rds %>%
   st_transform(crs = 4326)
-tmp <- st_join(punten_mod, UTM1, join = st_intersects) %>%
+tmp <- st_join(points_mod, UTM1, join = st_intersects) %>%
   group_by(TAG) %>%
-  summarise(aantal = length(TAG)) %>%
+  summarise(number = length(TAG)) %>%
   st_drop_geometry()
 
 Shape_mod_dummy <- merge(UTM1, tmp, by='TAG', all.x=T) %>%
-  mutate(aantal = replace_na(aantal,0))
+  mutate(number = replace_na(number,0))
 
-Shape_mod_dummy$Bezettingskans <- cut(Shape_mod_dummy$aantal,
+Shape_mod_dummy$Probability <- cut(Shape_mod_dummy$number,
                                       breaks = c(0,1,5,20,Inf),
-                                      labels = c("Accidenteel","Laag",
-                                                 "Middel","Hoog"), 
+                                      labels = c("Accidental","Low",
+                                                 "Middle","High"), 
                                       include_lowest = TRUE, 
                                       right = FALSE)
 
-factpal <- colorFactor(heat.colors(4), Shape_mod_dummy$Bezettingskans, 
+factpal <- colorFactor(heat.colors(4), Shape_mod_dummy$Probability, 
                        reverse=T)
 
-kaart <- leaflet(subset(Shape_mod_dummy, aantal>0)) %>%
+map <- leaflet(subset(Shape_mod_dummy, number > 0)) %>%
   addTiles() %>%
-  addPolygons(color = ~factpal(Bezettingskans),
+  addPolygons(color = ~factpal(Probability),
               opacity=0,
               fillOpacity=0.8) %>%
-  addLegend(pal = factpal, values = ~Bezettingskans)
+  addLegend(pal = factpal, values = ~Probability)
 
-kaart
-
-saveWidget(kaart, file = "kaart_bezettingskans_2025_2027.html", selfcontained = TRUE)
-
-barplot(table(Shape_mod_dummy$Bezettingskans))
+map
 
 ```
