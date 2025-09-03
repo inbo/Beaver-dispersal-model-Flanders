@@ -1,5 +1,5 @@
 ---
-title: "Beaver_movement_Flanders"
+title: "Beaver_dispersal_model_Flanders"
 author: 
 - "Frank Huysentruyt, Research Institute for Nature and Forest (INBO)"
 - "Robrecht Dockx, Research Institute for Nature and Forest (INBO)""
