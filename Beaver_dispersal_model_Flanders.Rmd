@@ -14,12 +14,11 @@ library(raster)#read raster data
 library(SiMRiv)#simulate movements
 library(leaflet)#maps
 library(sf)#simple features
-# library(terra)
 ```
 
 ## Introduction
 
-This code describes a model that simulates movements of beavers starting from point locations (known territories) in Flanders. 
+This code describes a model that simulates movements of beavers starting from point locations (known territories) in Flanders. For input, it uses the raster output of a Maxent model (projection_wide) for Flanders and surrounding 10km buffer as a habit suitability layer. It also u
 
 ```{r read data, include = FALSE}
 ##Read habitat suitability layer
@@ -177,5 +176,60 @@ for (z in 1:2) {
 saveRDS(allpoints, paste0("./Output/allpoints_", z, ".RDS"))
   
 }
+
+```
+
+```{r read_in_data1}
+
+data <- file.path("./Output/")
+
+rds_files <- list.files(data, pattern = "\\.RDS$", full.names = TRUE)
+
+data_rds <- do.call(rbind, lapply(rds_files, readRDS))
+
+data_first <- data_rds %>% filter(run == 0 & jaar == 0) %>% 
+  distinct(geometry, .keep_all = TRUE)
+
+data_second <- data_rds %>% filter(run != 0)
+
+data_rds <- rbind(data_first, 
+                  data_second)
+
+```
+
+```{r plot1}
+
+points_mod <- data_rds %>%
+  st_transform(crs = 4326)
+tmp <- st_join(punten_mod, UTM1, join = st_intersects) %>%
+  group_by(TAG) %>%
+  summarise(aantal = length(TAG)) %>%
+  st_drop_geometry()
+
+Shape_mod_dummy <- merge(UTM1, tmp, by='TAG', all.x=T) %>%
+  mutate(aantal = replace_na(aantal,0))
+
+Shape_mod_dummy$Bezettingskans <- cut(Shape_mod_dummy$aantal,
+                                      breaks = c(0,1,5,20,Inf),
+                                      labels = c("Accidenteel","Laag",
+                                                 "Middel","Hoog"), 
+                                      include_lowest = TRUE, 
+                                      right = FALSE)
+
+factpal <- colorFactor(heat.colors(4), Shape_mod_dummy$Bezettingskans, 
+                       reverse=T)
+
+kaart <- leaflet(subset(Shape_mod_dummy, aantal>0)) %>%
+  addTiles() %>%
+  addPolygons(color = ~factpal(Bezettingskans),
+              opacity=0,
+              fillOpacity=0.8) %>%
+  addLegend(pal = factpal, values = ~Bezettingskans)
+
+kaart
+
+saveWidget(kaart, file = "kaart_bezettingskans_2025_2027.html", selfcontained = TRUE)
+
+barplot(table(Shape_mod_dummy$Bezettingskans))
 
 ```
