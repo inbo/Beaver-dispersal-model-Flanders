@@ -2,7 +2,7 @@
 title: "Beaver_dispersal_model_Flanders"
 author: 
 - "Frank Huysentruyt, Research Institute for Nature and Forest (INBO)"
-- "Robrecht Dockx, Research Institute for Nature and Forest (INBO)""
+- "Robrecht Dockx, Research Institute for Nature and Forest (INBO)"
 date: "2025-09-03"
 output: html_document
 ---
@@ -18,7 +18,19 @@ library(sf)#simple features
 
 ## Introduction
 
-This code describes a model that simulates movements of beavers starting from point locations (known territories) in Flanders. For input, it uses the raster output of a Maxent model (projection_wide) for Flanders and surrounding 10km buffer as a habit suitability layer. It also u
+This code describes a model that simulates dispersal movements of beavers in Flanders. As starting points for dispersal we used a layer with 457 known territories of beavers in Flanders, represented by point locations.  As a habit suitability layern the raster output of a Maxent model (projection_wide) for Flanders and surrounding 10 km buffer is used. This raster layer is combined with a layer containing the major river systems in this area as a linestring object.We also use an UTM 1*1 km square layer of Flanders to project the output of this dispersal model on. 
+
+This code models how beavers disperse in Flanders. It starts with a layer of 457 known beaver territories, represented as points. 
+
+The model uses a few key layers to simulate beaver movement:
+
+* Habitat Suitability: A raster layer created by a Maxent model (called "projection_wide") that shows suitable beaver habitats in Flanders and a 10 km buffer around it.
+
+* River Systems: A linestring layer representing the major rivers in the same area. This is combined with the habitat suitability layer.
+
+* Grid: An UTM 1x1 km square layer of Flanders. This layer is used to project the final output of the dispersal model, making it easier to visualize and analyze the results.
+
+The code's goal is to predict and map where beavers might move based on these habitat and river data sets.
 
 ```{r read data, include = FALSE}
 ##Read habitat suitability layer
@@ -51,31 +63,18 @@ resistance <- unsuitability# Build resistance layer
 resistance[!is.na(riv_ras[])] <- 0.05  # give rivers low resistance value
 ```
 
-## Including Plots
+## Define model functions
 
-You can also embed plots, for example:
+In the next code chunk, different functions needed within the model itself are defined:
+* the levy walker function
 
-```{r define walker, eval = FALSE}
+* the simulate_row function: this function allows 3 levy walker simulations per step, stores valid outcomes and alters suitability accordingly
 
-set.seed(12345)
-dummy_start <- sample(terr_2024$geometry, 5)#dummy with 5 starting points for demo
-
-init_dummy_all <- dummy_start %>% 
-  st_transform(crs = 25831)
-init_dummy_all <- st_coordinates(init_dummy_all)
-
-##Define walker
-levy.walker <- (species(state.RW() + state.CRW(0.98), trans = transitionMatrix(0.1, 0.1)) + 40)*1000
-
-totaal <- NULL
-allpoints <- st_as_sf(data.frame("x" = init_dummy_all[,1],
-                                  "y" = init_dummy_all[,2], run = 0, 
-                                  year = 0),
-                       coords = c("x", "y"), crs = 25831)
-
-```
+* the randomRows function: this function samples the number of points needed to mimic a growing population
 
 ```{r model functions, eval = FALSE}
+levy.walker <- (species(state.RW() + state.CRW(0.98), trans = transitionMatrix(0.1, 0.1)) + 40)*1000
+
 simulate_row <- function(X, Y, levy.walker, resistance, suitraster, steps, init_dummy_all) {
   # Select starting coordinates
   coords <- matrix(c(X, Y), nrow = 1, ncol = 2)
@@ -118,7 +117,22 @@ randomRows = function(df,n){
 }
 ```
 
+## Run the model
+
+This code selects the number of starting points (preferably all, limited for the demo) and defines the number of model runs (z). It stores the outcome of each model run as an .RDS file.
+
 ```{r model, eval = FALSE}
+set.seed(12345)
+dummy_start <- sample(terr_2024$geometry, 5)#dummy with 5 starting points for demo
+
+init_dummy_all <- dummy_start %>% 
+  st_transform(crs = 25831)
+init_dummy_all <- st_coordinates(init_dummy_all)
+
+allpoints <- st_as_sf(data.frame("x" = init_dummy_all[,1],
+                                  "y" = init_dummy_all[,2], run = 0, 
+                                  year = 0),
+                       coords = c("x", "y"), crs = 25831)
 
 suitraster <-  st_as_sf(rasterToPolygons(suitability))
 suitraster_base <- suitraster %>%  st_transform(crs = 25831)
@@ -178,6 +192,9 @@ saveRDS(allpoints, paste0("./Output/allpoints_", z, ".RDS"))
 }
 
 ```
+## Plot the result
+
+These two code chunks read all .RDS files, combine them and map them onto the 1*1 km square grid.
 
 ```{r read_in_data1}
 
